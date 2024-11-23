@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../widgets/custom_text_field.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
 
-  Future<void> _signIn() async {
+  Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -27,61 +27,41 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      debugPrint('=================== LOGIN ATTEMPT ===================');
-      debugPrint('Email: ${_emailController.text.trim()}');
-      debugPrint('Password length: ${_passwordController.text.length}');
-      
-      final result = await SupabaseService.signIn(
+      final result = await SupabaseService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      
-      if (!mounted) return;
-      
-      // Check if email is verified
-      if (result.user?.emailConfirmedAt == null) {
-        debugPrint('Email not verified for user: ${result.user?.id}');
-        setState(() {
-          _errorMessage = 'Please verify your email before signing in';
-        });
-        return;
-      }
 
-      debugPrint('Login successful for user: ${result.user?.id}');
-      // Force navigation refresh
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      if (!mounted) return;
+
+      if (result.user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please check your email to verify your account'),
+            duration: Duration(seconds: 5),
+          ),
+        );
+        Navigator.pop(context); // Go back to login screen
       }
-      
-    } on AuthException catch (e) {
-      debugPrint('=================== LOGIN AUTH ERROR ===================');
-      debugPrint('Error message: ${e.message}');
-      debugPrint('Error status: ${e.statusCode}');
-      debugPrint('Full error: $e');
-      
-      setState(() {
-        switch (e.message) {
-          case 'Invalid login credentials':
-            _errorMessage = 'Invalid email or password';
-            break;
-          case 'Email not confirmed':
-            _errorMessage = 'Please verify your email before signing in';
-            break;
-          default:
-            _errorMessage = e.message;
-        }
-      });
     } catch (e) {
-      debugPrint('=================== LOGIN UNEXPECTED ERROR ===================');
-      debugPrint('Error type: ${e.runtimeType}');
-      debugPrint('Error details: $e');
-      
-      setState(() => _errorMessage = 'Network error. Please check your connection and try again.');
+      setState(() {
+        _errorMessage = e.toString();
+      });
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -93,15 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 32),
               Text(
-                'Sign In',
+                'Create Account',
                 style: Theme.of(context).textTheme.displayLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Please sign in to continue',
+                'Sign up to get started',
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),
@@ -124,16 +104,32 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               CustomTextField(
                 label: 'Password',
-                hint: 'Enter your password',
+                hint: 'Create a password',
                 controller: _passwordController,
                 isPassword: true,
                 textCapitalization: TextCapitalization.none,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
+                    return 'Please enter a password';
                   }
                   if (value.length < 6) {
                     return 'Password must be at least 6 characters';
+                  }
+                  return null;
+                },
+              ),
+              CustomTextField(
+                label: 'Confirm Password',
+                hint: 'Confirm your password',
+                controller: _confirmPasswordController,
+                isPassword: true,
+                textCapitalization: TextCapitalization.none,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please confirm your password';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match';
                   }
                   return null;
                 },
@@ -152,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _isLoading ? null : _signIn,
+                onPressed: _isLoading ? null : _signUp,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                   shape: RoundedRectangleBorder(
@@ -164,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: Theme.of(context).colorScheme.onPrimary,
                         size: 24,
                       )
-                    : const Text('Sign In'),
+                    : const Text('Create Account'),
               ),
               const SizedBox(height: 16),
               Row(
@@ -205,14 +201,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    "Don't have an account? ",
+                    'Already have an account? ',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => Navigator.pushNamed(context, '/register'),
-                    child: const Text('Sign Up'),
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    child: const Text('Sign In'),
                   ),
                 ],
               ),
@@ -221,12 +215,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 }

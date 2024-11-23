@@ -125,4 +125,55 @@ class SupabaseService {
       rethrow;
     }
   }
+
+  // Phone Authentication Methods
+  static Future<AuthResponse> signInWithPhone({
+    required String phone,
+  }) async {
+    try {
+      debugPrint('=================== PHONE SIGN IN START ===================');
+      debugPrint('Attempting to sign in with phone: $phone');
+      
+      // First request the OTP
+      await client.auth.signInWithOtp(
+        phone: phone,
+      );
+
+      // Return a placeholder AuthResponse since OTP was sent successfully
+      return AuthResponse(
+        session: null,
+        user: null,
+      );
+    } catch (e) {
+      debugPrint('=================== PHONE SIGN IN ERROR ===================');
+      debugPrint('Error during phone sign in: $e');
+      rethrow;
+    }
+  }
+
+  static Future<AuthResponse> verifyPhoneOTP({
+    required String phone,
+    required String token,
+  }) async {
+    try {
+      debugPrint('=================== VERIFY OTP START ===================');
+      debugPrint('Attempting to verify OTP for phone: $phone');
+      
+      final response = await client.auth.verifyOTP(
+        type: OtpType.sms,
+        phone: phone,
+        token: token,
+      );
+
+      debugPrint('=================== VERIFY OTP RESPONSE ===================');
+      debugPrint('User: ${response.user?.id}');
+      debugPrint('Session: ${response.session?.user.id}');
+      
+      return response;
+    } catch (e) {
+      debugPrint('=================== VERIFY OTP ERROR ===================');
+      debugPrint('Error during OTP verification: $e');
+      rethrow;
+    }
+  }
 }

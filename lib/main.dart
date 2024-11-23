@@ -6,6 +6,7 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/email_confirmation_screen.dart';
+import 'screens/phone_login_screen.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/custom_snackbar.dart';
@@ -49,49 +50,22 @@ class _MyAppState extends State<MyApp> {
                   debugPrint('Has error: ${snapshot.hasError}');
                   debugPrint('Has data: ${snapshot.hasData}');
                   debugPrint('Connection state: ${snapshot.connectionState}');
-                  if (snapshot.hasData) {
-                    debugPrint('Session: ${snapshot.data?.session?.user.id}');
-                    debugPrint('Event type: ${snapshot.data?.event}');
-                    debugPrint('Current user: ${SupabaseService.currentUser?.id}');
-                  }
-
+                  
                   if (snapshot.hasError) {
-                    debugPrint('Auth state error: ${snapshot.error}');
-                    return Center(
-                      child: Text(
-                        'Error: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    );
+                    return const LoginScreen();
                   }
 
-                  // Check if we're still waiting for the initial connection
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    debugPrint('Waiting for auth state connection...');
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                  if (!snapshot.hasData || snapshot.data?.session == null) {
+                    return const LoginScreen();
                   }
 
-                  final session = snapshot.data?.session;
-                  final event = snapshot.data?.event;
-                  
-                  debugPrint('Session state: ${session != null ? "Active" : "Null"}');
-                  debugPrint('Auth event: $event');
-                  
-                  // Force a rebuild when auth state changes
-                  if (event == AuthChangeEvent.signedIn || 
-                      event == AuthChangeEvent.signedOut ||
-                      event == AuthChangeEvent.tokenRefreshed) {
-                    debugPrint('Significant auth event detected: $event');
-                  }
-
-                  return session == null ? const LoginScreen() : const HomeScreen();
+                  return const HomeScreen();
                 },
               ),
             ),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
+        '/phone-login': (context) => const PhoneLoginScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/email-confirmation': (context) => const EmailConfirmationScreen(),
       },
