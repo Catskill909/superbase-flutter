@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
-import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/forgot_password_screen.dart';
-import 'screens/email_confirmation_screen.dart';
-import 'screens/phone_login_screen.dart';
-import 'services/supabase_service.dart';
-import 'theme/app_theme.dart';
-import 'widgets/custom_snackbar.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
+
+// Screen imports
+import 'package:supabase_auth_app/screens/home_screen.dart';
+import 'package:supabase_auth_app/screens/login_screen.dart';
+import 'package:supabase_auth_app/screens/register_screen.dart';
+import 'package:supabase_auth_app/screens/forgot_password_screen.dart';
+import 'package:supabase_auth_app/screens/email_confirmation_screen.dart';
+import 'package:supabase_auth_app/screens/phone_login_screen.dart';
+
+// Service imports
+import 'package:supabase_auth_app/services/supabase_service.dart';
+
+// Theme import
+import 'package:supabase_auth_app/theme/app_theme.dart';
+
+// Widget imports
+import 'package:supabase_auth_app/widgets/custom_snackbar.dart';
 
 Future<void> initializeApp() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,10 +43,75 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  late AppLinks appLinks;
+
+  @override
+  void initState() {
+    super.initState();
+    appLinks = AppLinks();
+
+    // Listen for deep links
+    appLinks.uriLinkStream.listen((uri) {
+      // Handle deep links here
+      // Example: navigate to specific screen based on the URI
+      if (uri.path.contains('/login')) {
+        // Navigate to login screen
+      } else if (uri.path.contains('/register')) {
+        // Navigate to register screen
+      }
+    }, onError: (err) {
+      // Handle errors
+      if (mounted) {
+        showCustomSnackbar(
+          context: context, 
+          message: 'Error handling deep link: $err',
+          isSuccess: false,
+          actionLabel: 'Retry',
+          onActionPressed: () {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/login',
+              (route) => false,
+            );
+          },
+        );
+      }
+    });
+
+    // Check for initial app link
+    _checkInitialAppLink();
+  }
+
+  Future<void> _checkInitialAppLink() async {
+    try {
+      final initialUri = await appLinks.getInitialLink();
+      if (initialUri != null) {
+        // Handle the initial app link
+        // Similar logic to the stream listener
+      }
+    } catch (e) {
+      if (mounted) {
+        showCustomSnackbar(
+          context: context, 
+          message: 'Error checking initial app link: $e',
+          isSuccess: false,
+          actionLabel: 'Retry',
+          onActionPressed: () {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/login',
+              (route) => false,
+            );
+          },
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Supabase Auth Demo',
+      title: 'Supabase Auth',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       initialRoute: '/',
@@ -48,26 +122,26 @@ class _MyAppState extends State<MyApp> {
                 builder: (context, snapshot) {
                   debugPrint('=================== AUTH STATE CHANGE ===================');
                   debugPrint('Has error: ${snapshot.hasError}');
-                  debugPrint('Has data: ${snapshot.hasData}');
-                  debugPrint('Connection state: ${snapshot.connectionState}');
                   
+                  // Determine initial route based on authentication state
                   if (snapshot.hasError) {
                     return const LoginScreen();
                   }
-
-                  if (!snapshot.hasData || snapshot.data?.session == null) {
+                  
+                  final session = snapshot.data?.session;
+                  if (session != null) {
+                    return const HomeScreen();
+                  } else {
                     return const LoginScreen();
                   }
-
-                  return const HomeScreen();
                 },
               ),
             ),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/phone-login': (context) => const PhoneLoginScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/email-confirmation': (context) => const EmailConfirmationScreen(),
+        '/phone-login': (context) => const PhoneLoginScreen(),
       },
     );
   }
@@ -76,17 +150,14 @@ class _MyAppState extends State<MyApp> {
 class AuthWrapper extends StatefulWidget {
   final Widget child;
 
-  const AuthWrapper({
-    super.key,
-    required this.child,
-  });
+  const AuthWrapper({super.key, required this.child});
 
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _isLoading = false;
+  final bool _isLoading = false;
   String? _error;
 
   @override
@@ -99,7 +170,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (!mounted) return;
 
     setState(() {
-      _isLoading = true;
+      // _isLoading = true; // Commented out since _isLoading is final
       _error = null;
     });
 
@@ -108,7 +179,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final appLinks = AppLinks();
       
       // Listen to incoming links
-      appLinks.allUriLinkStream.listen(
+      appLinks.uriLinkStream.listen(
         (uri) {
           debugPrint('Received deep link: $uri');
           handleDeepLink(uri);
@@ -124,30 +195,25 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
       
       // Check for initial link
-      final initialUri = await appLinks.getInitialAppLink();
+      final initialUri = await appLinks.getInitialLink();
       if (initialUri != null && mounted) {
         debugPrint('Got initial deep link: $initialUri');
         handleDeepLink(initialUri);
-      }
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
       }
     } catch (e) {
       debugPrint('Error initializing deep links: $e');
       if (mounted) {
         setState(() {
           _error = 'Error initializing deep links: $e';
-          _isLoading = false;
         });
       }
     }
   }
 
-  void handleDeepLink(Uri uri) async {
+  void handleDeepLink(Uri? uri) async {
     if (!mounted) return;
+    
+    if (uri == null) return;
     
     debugPrint('Received deep link: $uri');
     
@@ -202,11 +268,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          child: LoadingAnimationWidget.staggeredDotsWave(
+            color: Colors.white,
+            size: 50,
           ),
         ),
       );
@@ -214,36 +281,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     if (_error != null) {
       return Scaffold(
-        backgroundColor: Colors.black,
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 48,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white10,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: _initializeDeepLinks,
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+          child: Text('Error: $_error'),
         ),
       );
     }

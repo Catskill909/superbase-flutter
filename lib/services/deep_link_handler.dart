@@ -14,7 +14,7 @@ class DeepLinkHandler {
     });
 
     // Handle any initial URI
-    _appLinks.getInitialAppLink().then((uri) {
+    _appLinks.getInitialLink().then((uri) {
       if (context.mounted) {
         _handleDeepLink(uri, context);
       }
