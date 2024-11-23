@@ -3,20 +3,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
   static const String supabaseUrl = 'https://sfzfcofsudrirhjbokqs.supabase.co';
-  static const String anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmemZjb2ZzdWRyaXJoamJva3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzIxNTk4MzQsImV4cCI6MjA0NzczNTgzNH0.MCBkLrGg1LchNwd6qQkrAF0BPu2krWiZTy9WmNZk4jo';
+  static const String anonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmemZjb2ZzdWRyaXJoamJva3FzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzIxNTk4MzQsImV4cCI6MjA0NzczNTgzNH0.MCBkLrGg1LchNwd6qQkrAF0BPu2krWiZTy9WmNZk4jo';
+
+  static bool _isInitialized = false;
 
   static Future<void> initialize() async {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: anonKey,
-      debug: true,
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-      ),
-    );
+    if (_isInitialized) {
+      debugPrint('SupabaseService already initialized');
+      return;
+    }
+
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: anonKey,
+      );
+      _isInitialized = true;
+      debugPrint('SupabaseService initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing SupabaseService: $e');
+      rethrow;
+    }
   }
 
   static SupabaseClient get client => Supabase.instance.client;
+
+  static Stream<AuthState> get authStateChanges =>
+      client.auth.onAuthStateChange;
+
+  static User? get currentUser => client.auth.currentUser;
 
   static Future<AuthResponse> signUp({
     required String email,
@@ -24,24 +40,29 @@ class SupabaseService {
   }) async {
     try {
       debugPrint('Attempting to sign up user: $email');
+      
       final response = await client.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: 'com.starkey.supabase://auth-callback/signup-confirmed',
       );
-      debugPrint('Sign up response received:');
-      debugPrint('User: ${response.user?.toJson()}');
-      debugPrint('Session: ${response.session?.toJson()}');
-      debugPrint('Raw response: $response');
 
-      if (response.user == null) {
-        throw const AuthException('Failed to create user account');
-      }
-
+      debugPrint('Sign up response received: ${response.user?.id}');
       return response;
-    } catch (e, stackTrace) {
-      debugPrint('Error during sign up: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } on AuthException catch (e) {
+      debugPrint('Auth Exception during sign up: ${e.message}');
+      if (e.message.toLowerCase().contains('rate limit')) {
+        throw const AuthException(
+          'Please wait a few minutes before trying to sign up again.',
+        );
+      }
       rethrow;
+    } catch (e, stackTrace) {
+      debugPrint('Unexpected error during sign up: $e');
+      debugPrint('Stack trace: $stackTrace');
+      throw const AuthException(
+        'An unexpected error occurred. Please try again later.',
+      );
     }
   }
 
@@ -50,54 +71,58 @@ class SupabaseService {
     required String password,
   }) async {
     try {
+      debugPrint('=================== LOGIN START ===================');
       debugPrint('Attempting to sign in user: $email');
+      
       final response = await client.auth.signInWithPassword(
         email: email,
         password: password,
       );
-      debugPrint('Sign in response received:');
-      debugPrint('User: ${response.user?.toJson()}');
-      debugPrint('Session: ${response.session?.toJson()}');
+
+      debugPrint('=================== LOGIN RESPONSE ===================');
+      debugPrint('User: ${response.user?.id}');
+      debugPrint('Session: ${response.session?.user.id}');
+      debugPrint('Email verified: ${response.user?.emailConfirmedAt != null}');
+      
       return response;
     } catch (e) {
+      debugPrint('=================== LOGIN ERROR ===================');
       debugPrint('Error during sign in: $e');
       rethrow;
     }
   }
 
-  static Future<bool> isUserConfirmed(String email) async {
+  static Future<void> signOut() async {
     try {
-      final response = await client.auth.signInWithPassword(
-        email: email,
-        password: 'dummy-password', // This will fail, but we'll check the error
-      );
-      return response.user != null;
+      await client.auth.signOut();
     } catch (e) {
-      if (e is AuthException) {
-        // If the error is about wrong password, the email is confirmed
-        return e.message.contains('Invalid login credentials');
-      }
-      return false;
+      debugPrint('Error during sign out: $e');
+      rethrow;
     }
   }
 
-  static Future<void> signOut() async {
-    await client.auth.signOut();
-  }
-
   static Future<void> resetPassword(String email) async {
-    await client.auth.resetPasswordForEmail(email);
+    try {
+      await client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'com.starkey.supabase://auth-callback',
+      );
+    } catch (e) {
+      debugPrint('Error during password reset: $e');
+      rethrow;
+    }
   }
 
-  static Future<UserResponse> updatePassword(String newPassword) async {
-    return await client.auth.updateUser(
-      UserAttributes(
-        password: newPassword,
-      ),
-    );
+  static Future<void> updatePassword(String newPassword) async {
+    try {
+      await client.auth.updateUser(
+        UserAttributes(
+          password: newPassword,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error updating password: $e');
+      rethrow;
+    }
   }
-
-  static Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
-
-  static User? get currentUser => client.auth.currentUser;
 }

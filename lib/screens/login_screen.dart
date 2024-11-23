@@ -27,6 +27,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      debugPrint('=================== LOGIN ATTEMPT ===================');
+      debugPrint('Email: ${_emailController.text.trim()}');
+      debugPrint('Password length: ${_passwordController.text.length}');
+      
       final result = await SupabaseService.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -36,13 +40,25 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Check if email is verified
       if (result.user?.emailConfirmedAt == null) {
+        debugPrint('Email not verified for user: ${result.user?.id}');
         setState(() {
           _errorMessage = 'Please verify your email before signing in';
         });
         return;
       }
-      // Navigation will be handled by auth state changes
+
+      debugPrint('Login successful for user: ${result.user?.id}');
+      // Force navigation refresh
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      }
+      
     } on AuthException catch (e) {
+      debugPrint('=================== LOGIN AUTH ERROR ===================');
+      debugPrint('Error message: ${e.message}');
+      debugPrint('Error status: ${e.statusCode}');
+      debugPrint('Full error: $e');
+      
       setState(() {
         switch (e.message) {
           case 'Invalid login credentials':
@@ -56,6 +72,10 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       });
     } catch (e) {
+      debugPrint('=================== LOGIN UNEXPECTED ERROR ===================');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error details: $e');
+      
       setState(() => _errorMessage = 'Network error. Please check your connection and try again.');
     } finally {
       if (mounted) {

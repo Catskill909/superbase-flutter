@@ -25,10 +25,10 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>supabase-auth-app</string>
+				<string>com.starkey.supabase</string>
 			</array>
 			<key>CFBundleURLName</key>
-			<string>auth</string>
+			<string>com.starkey.supabase</string>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>

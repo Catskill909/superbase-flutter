@@ -52,22 +52,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
             barrierDismissible: false,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: const Text('Account Created'),
+                title: const Text('Verify Your Email'),
                 content: SingleChildScrollView(
                   child: ListBody(
                     children: <Widget>[
-                      Text('Account created successfully for: ${response.user!.email}'),
+                      Text('We sent a verification email to: ${response.user!.email}'),
                       const SizedBox(height: 10),
-                      const Text('You can now sign in with your email and password.'),
+                      const Text('Please check your email and click the verification link to complete your registration.'),
+                      const SizedBox(height: 10),
+                      const Text('After confirming your email, you can log in to your account.'),
                     ],
                   ),
                 ),
                 actions: <Widget>[
                   TextButton(
-                    child: const Text('Go to Login'),
+                    child: const Text('OK'),
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.pop(context); // Return to login screen
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/login',
+                        (route) => false,
+                      );
+                      // Show a snackbar on the login screen
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please check your email to verify your account before logging in.'),
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
                     },
                   ),
                 ],

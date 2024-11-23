@@ -46,7 +46,8 @@ class DeepLinkHandler {
           
           if (context.mounted) {
             _showMessage(context, 'Email confirmed successfully!');
-            Navigator.of(context).pushReplacementNamed('/home');
+            // Navigate to root route and let the auth state handle navigation
+            Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
           }
         }
       }
