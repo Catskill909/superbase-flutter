@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../widgets/custom_snackbar.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -7,6 +8,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = SupabaseService.currentUser;
+    final displayId = user?.phone ?? user?.email ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -15,8 +17,28 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
-              await SupabaseService.signOut();
-              // Navigation will be handled by auth state changes
+              try {
+                debugPrint('Signing out user: $displayId');
+                await SupabaseService.signOut();
+                
+                if (context.mounted) {
+                  // Explicitly navigate back to login screen
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/login',
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error signing out: $e');
+                if (context.mounted) {
+                  showCustomSnackbar(
+                    context: context,
+                    message: 'Error signing out. Please try again.',
+                    isSuccess: false,
+                  );
+                }
+              }
             },
           ),
         ],
@@ -39,7 +61,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                user?.email ?? '',
+                displayId,
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 32),

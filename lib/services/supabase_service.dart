@@ -133,7 +133,11 @@ class SupabaseService {
 
   static Future<void> signOut() async {
     try {
-      await client.auth.signOut();
+      debugPrint('Signing out user...');
+      await client.auth.signOut(
+        scope: SignOutScope.global,
+      );
+      debugPrint('Sign out successful');
     } catch (e) {
       debugPrint('Error during sign out: $e');
       rethrow;
@@ -239,6 +243,14 @@ class SupabaseService {
       debugPrint('=================== VERIFY OTP RESPONSE ===================');
       debugPrint('User: ${response.user?.id}');
       debugPrint('Session: ${response.session?.user.id}');
+      
+      // Ensure we have a valid session
+      if (response.session == null) {
+        throw const AuthException('Failed to create session after phone verification');
+      }
+      
+      // The session is already set by verifyOTP, no need to set it manually
+      debugPrint('Session established successfully');
       
       return response;
     } catch (e) {

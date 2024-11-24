@@ -64,8 +64,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     });
 
     try {
-      debugPrint('Verifying OTP for phone: $_currentPhone');
-      
       final response = await SupabaseService.verifyPhoneOTP(
         phone: _currentPhone!,
         token: _otpController.text.trim(),
@@ -74,27 +72,34 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       if (!mounted) return;
 
       if (response.session != null) {
-        debugPrint('Phone verification successful');
-        debugPrint('Session user: ${response.session?.user.id}');
-        if (!mounted) return;
+        // Explicitly navigate to home after successful verification
         Navigator.pushNamedAndRemoveUntil(
           context,
           '/home',
           (route) => false,
         );
       } else {
-        setState(() => _errorMessage = 'Invalid verification code');
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Invalid verification code';
+        });
       }
-
+      
     } on AuthException catch (e) {
       debugPrint('Auth Exception during OTP verification: ${e.message}');
-      setState(() => _errorMessage = e.message);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.message;
+        });
+      }
     } catch (e) {
       debugPrint('Unexpected error during OTP verification: $e');
-      setState(() => _errorMessage = 'An unexpected error occurred. Please try again.');
-    } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'An unexpected error occurred. Please try again.';
+        });
       }
     }
   }

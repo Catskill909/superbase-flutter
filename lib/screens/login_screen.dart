@@ -38,34 +38,26 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
       
-      debugPrint('Login response:');
-      debugPrint('- User: ${response.user?.id}');
-      debugPrint('- Session: ${response.session?.accessToken != null}');
-      debugPrint('- Email verified: ${response.user?.emailConfirmedAt}');
+      if (!mounted) return;
       
-      if (mounted) {
+      if (response.session != null) {
+        // Explicitly navigate to home after successful login
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
+      } else {
         setState(() {
           _isLoading = false;
+          _error = 'Invalid login credentials';
         });
-        
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
-          ),
-        );
       }
     } catch (e) {
-      debugPrint('Login error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          if (e.toString().contains('Email not confirmed')) {
-            _error = 'Please verify your email before signing in.';
-          } else {
-            _error = 'Invalid email or password.';
-          }
+          _error = e.toString();
         });
       }
     }
