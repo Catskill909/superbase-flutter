@@ -46,52 +46,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (response.user != null) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return AlertDialog(
-                title: const Text('Verify Your Email'),
-                content: SingleChildScrollView(
-                  child: ListBody(
-                    children: <Widget>[
-                      Text('We sent a verification email to: ${response.user!.email}'),
-                      const SizedBox(height: 10),
-                      const Text('Please check your email and click the verification link to complete your registration.'),
-                      const SizedBox(height: 10),
-                      const Text('After confirming your email, you can log in to your account.'),
-                    ],
-                  ),
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop(); // Close dialog
-                      Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/login',
-                        (route) => false,
-                      );
-                      // Show a snackbar on the login screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please check your email to verify your account before logging in.'),
-                          duration: Duration(seconds: 5),
-                        ),
-                      );
-                    },
-                  ),
+        // Show verification dialog
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.mark_email_read, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text('Verify Your Email'),
                 ],
-              );
-            },
-          );
-        }
+              ),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: <Widget>[
+                    Text('We sent a verification email to: ${response.user!.email}'),
+                    const SizedBox(height: 10),
+                    const Text('Please check your email and click the verification link to complete your registration.'),
+                    const SizedBox(height: 10),
+                    const Text('After confirming your email, you can log in to your account.'),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                    // Navigate to login screen
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (route) => false,
+                    );
+                  },
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            );
+          },
+        );
       } else {
         setState(() {
           _errorMessage = 'Failed to create account. Please try again.';
-          _showPersistentError(_errorMessage!);
+          _isLoading = false;
         });
       }
     } on AuthException catch (e) {
@@ -101,13 +103,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint('Full error: $e');
       
       setState(() {
+        _isLoading = false;
         switch (e.message) {
           case 'User already registered':
             _errorMessage = 'This email is already registered. Please sign in instead.';
             break;
           case 'Invalid email':
-            _errorMessage = 'Please enter a valid email address.';
-            break;
           case 'Signup email invalid':
             _errorMessage = 'Please enter a valid email address.';
             break;
@@ -117,63 +118,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
           default:
             _errorMessage = 'An error occurred: ${e.message}';
         }
-        _showPersistentError(_errorMessage!);
       });
-      
     } catch (e) {
       debugPrint('=================== UNEXPECTED ERROR ===================');
       debugPrint('Error type: ${e.runtimeType}');
       debugPrint('Error details: $e');
       
-      setState(() => _errorMessage = 'An unexpected error occurred: $e');
-      
       if (mounted) {
-        _showPersistentError(_errorMessage!);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'An unexpected error occurred. Please try again.';
+        });
       }
     }
-  }
-
-  void _showPersistentError(String message) {
-    // Show a persistent error dialog
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Registration Error'),
-          content: SingleChildScrollView(
-            child: Text(message),
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('OK'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-    
-    // Also show a long-duration snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 10),
-        action: SnackBarAction(
-          label: 'DISMISS',
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
   }
 
   @override

@@ -50,17 +50,46 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         setState(() {
           _isLoading = false;
-          _error = 'Invalid login credentials';
         });
+        _showErrorDialog('Invalid login credentials. Please try again.');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _error = e.toString();
         });
+        _showErrorDialog(e.toString());
       }
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: 8),
+              const Text('Login Error'),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+        );
+      },
+    );
   }
 
   @override
