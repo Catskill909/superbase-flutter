@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
 
 class EmailConfirmationScreen extends StatelessWidget {
   const EmailConfirmationScreen({super.key});
@@ -31,13 +32,12 @@ class EmailConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/login',
-                    (route) => false,
-                  );
+                onPressed: () async {
+                  // Refresh the session to get the latest email verification status
+                  await SupabaseService.client.auth.refreshSession();
+                  // AuthWrapper will automatically handle navigation based on auth state
                 },
-                child: const Text('Continue to Sign In'),
+                child: const Text('Continue'),
               ),
             ],
           ),

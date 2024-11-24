@@ -16,7 +16,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  bool _resetSent = false;
 
   Future<void> _resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
@@ -28,9 +27,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     try {
       await SupabaseService.resetPassword(_emailController.text.trim());
-      setState(() => _resetSent = true);
+      
+      if (!mounted) return;
+
+      // Navigate to OTP verification screen
+      Navigator.pushReplacementNamed(
+        context,
+        '/verify-otp',
+        arguments: _emailController.text.trim(),
+      );
     } on AuthException catch (e) {
-      setState(() => _errorMessage = e.message);
+      setState(() {
+        if (e.message.contains('Email rate limit exceeded')) {
+          _errorMessage = 'Too many reset attempts. Please try again in an hour.';
+        } else {
+          _errorMessage = e.message;
+        }
+      });
     } catch (e) {
       setState(() => _errorMessage = 'An unexpected error occurred');
     } finally {
@@ -66,68 +79,43 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
-                if (!_resetSent) ...[
-                  CustomTextField(
-                    label: 'Email',
-                    hint: 'Enter your email',
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    textCapitalization: TextCapitalization.none,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        textAlign: TextAlign.center,
+                CustomTextField(
+                  label: 'Email',
+                  hint: 'Enter your email',
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textCapitalization: TextCapitalization.none,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _resetPassword,
-                    child: _isLoading
-                        ? LoadingAnimationWidget.staggeredDotsWave(
-                            color: Colors.white,
-                            size: 24,
-                          )
-                        : const Text('Reset Password'),
                   ),
-                ] else ...[
-                  const Icon(
-                    Icons.check_circle_outline,
-                    color: Colors.green,
-                    size: 64,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Password reset email sent!',
-                    style: Theme.of(context).textTheme.titleLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Please check your email for instructions to reset your password.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Return to Login'),
-                  ),
-                ],
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _resetPassword,
+                  child: _isLoading
+                      ? LoadingAnimationWidget.staggeredDotsWave(
+                          color: Colors.white,
+                          size: 24,
+                        )
+                      : const Text('Reset Password'),
+                ),
               ],
             ),
           ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -16,70 +15,58 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  String? _errorMessage;
+  String? _error;
 
-  Future<void> _signIn() async {
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
+      _error = null;
     });
 
     try {
-      debugPrint('=================== LOGIN ATTEMPT ===================');
-      debugPrint('Email: ${_emailController.text.trim()}');
-      debugPrint('Password length: ${_passwordController.text.length}');
-      
-      final result = await SupabaseService.signIn(
+      final response = await SupabaseService.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
       
-      if (!mounted) return;
+      debugPrint('Login response:');
+      debugPrint('- User: ${response.user?.id}');
+      debugPrint('- Session: ${response.session?.accessToken != null}');
+      debugPrint('- Email verified: ${response.user?.emailConfirmedAt}');
       
-      // Check if email is verified
-      if (result.user?.emailConfirmedAt == null) {
-        debugPrint('Email not verified for user: ${result.user?.id}');
+      if (mounted) {
         setState(() {
-          _errorMessage = 'Please verify your email before signing in';
+          _isLoading = false;
         });
-        return;
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
-
-      debugPrint('Login successful for user: ${result.user?.id}');
-      // Force navigation refresh
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-      }
-      
-    } on AuthException catch (e) {
-      debugPrint('=================== LOGIN AUTH ERROR ===================');
-      debugPrint('Error message: ${e.message}');
-      debugPrint('Error status: ${e.statusCode}');
-      debugPrint('Full error: $e');
-      
-      setState(() {
-        switch (e.message) {
-          case 'Invalid login credentials':
-            _errorMessage = 'Invalid email or password';
-            break;
-          case 'Email not confirmed':
-            _errorMessage = 'Please verify your email before signing in';
-            break;
-          default:
-            _errorMessage = e.message;
-        }
-      });
     } catch (e) {
-      debugPrint('=================== LOGIN UNEXPECTED ERROR ===================');
-      debugPrint('Error type: ${e.runtimeType}');
-      debugPrint('Error details: $e');
-      
-      setState(() => _errorMessage = 'Network error. Please check your connection and try again.');
-    } finally {
+      debugPrint('Login error: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          if (e.toString().contains('Email not confirmed')) {
+            _error = 'Please verify your email before signing in.';
+          } else {
+            _error = 'Invalid email or password.';
+          }
+        });
       }
     }
   }
@@ -138,12 +125,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   return null;
                 },
               ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => Navigator.pushNamed(context, '/forgot-password'),
+                  child: const Text('Forgot Password?'),
+                ),
+              ),
               const SizedBox(height: 16),
-              if (_errorMessage != null)
+              if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    _errorMessage!,
+                    _error!,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                     ),
@@ -152,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _isLoading ? null : _signIn,
+                onPressed: _isLoading ? null : _handleLogin,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                   shape: RoundedRectangleBorder(
@@ -221,12 +217,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
   }
 }

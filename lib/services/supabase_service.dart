@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -39,21 +39,60 @@ class SupabaseService {
     required String password,
   }) async {
     try {
-      debugPrint('Attempting to sign up user: $email');
+      debugPrint('Checking if user exists: $email');
+      
+      // Try to sign in first to check if user exists
+      try {
+        await client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+        // If we get here, user exists and password is correct
+        throw const AuthException(
+          'This email is already registered. Please sign in instead.',
+        );
+      } on AuthException catch (e) {
+        // If error is "Invalid login credentials", user doesn't exist
+        // If error is "Email not confirmed", user exists but needs verification
+        if (e.message.contains('Email not confirmed')) {
+          throw const AuthException(
+            'This email is already registered but not verified. Please check your email for the verification link.',
+          );
+        } else if (!e.message.contains('Invalid login credentials')) {
+          // Some other auth error occurred
+          rethrow;
+        }
+        // If we get here, user doesn't exist, proceed with signup
+      }
+      
+      debugPrint('Attempting to sign up new user: $email');
       
       final response = await client.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: 'com.starkey.supabase://auth-callback/signup-confirmed',
+        emailRedirectTo: kIsWeb 
+            ? null 
+            : 'com.starkey.supabase://auth-callback/',
+        data: {
+          'email_confirm': true,
+        },
       );
 
       debugPrint('Sign up response received: ${response.user?.id}');
+      
+      // Check if email confirmation was sent
+      if (response.user != null && response.session == null) {
+        debugPrint('Email confirmation required. Confirmation email should be sent.');
+      } else {
+        debugPrint('Unexpected response state. Session: ${response.session != null}, User: ${response.user != null}');
+      }
+      
       return response;
     } on AuthException catch (e) {
       debugPrint('Auth Exception during sign up: ${e.message}');
       if (e.message.toLowerCase().contains('rate limit')) {
         throw const AuthException(
-          'Please wait a few minutes before trying to sign up again.',
+          'Too many signup attempts. Please wait a few minutes before trying again.',
         );
       }
       rethrow;
@@ -105,7 +144,6 @@ class SupabaseService {
     try {
       await client.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'com.starkey.supabase://auth-callback',
       );
     } catch (e) {
       debugPrint('Error during password reset: $e');
@@ -113,8 +151,41 @@ class SupabaseService {
     }
   }
 
-  static Future<void> updatePassword(String newPassword) async {
+  static Future<void> verifyOTPAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
     try {
+      // First verify the OTP
+      await client.auth.verifyOTP(
+        email: email,
+        token: otp,
+        type: OtpType.recovery,
+      );
+
+      // Then update the password
+      await client.auth.updateUser(
+        UserAttributes(
+          password: newPassword,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error during OTP verification and password reset: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> updatePassword(String newPassword, [String? token]) async {
+    try {
+      if (token != null) {
+        // This is a password recovery flow
+        await client.auth.verifyOTP(
+          token: token,
+          type: OtpType.recovery,
+        );
+      }
+      
       await client.auth.updateUser(
         UserAttributes(
           password: newPassword,

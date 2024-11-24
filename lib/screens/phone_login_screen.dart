@@ -75,7 +75,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
       if (response.session != null) {
         debugPrint('Phone verification successful');
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        debugPrint('Session user: ${response.session?.user.id}');
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
       } else {
         setState(() => _errorMessage = 'Invalid verification code');
       }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
-import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 // Screen imports
 import 'package:supabase_auth_app/screens/home_screen.dart';
@@ -10,6 +10,8 @@ import 'package:supabase_auth_app/screens/register_screen.dart';
 import 'package:supabase_auth_app/screens/forgot_password_screen.dart';
 import 'package:supabase_auth_app/screens/email_confirmation_screen.dart';
 import 'package:supabase_auth_app/screens/phone_login_screen.dart';
+import 'package:supabase_auth_app/screens/reset_password_screen.dart';
+import 'package:supabase_auth_app/screens/verify_otp_screen.dart';
 
 // Service imports
 import 'package:supabase_auth_app/services/supabase_service.dart';
@@ -22,17 +24,25 @@ import 'package:supabase_auth_app/widgets/custom_snackbar.dart';
 
 Future<void> initializeApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
   try {
+    debugPrint('Initializing Supabase...');
     await SupabaseService.initialize();
-  } catch (e) {
+    debugPrint('Supabase initialization complete');
+  } catch (e, stackTrace) {
     debugPrint('Error initializing Supabase: $e');
-    // We'll handle the error in the UI
+    debugPrint('Stack trace: $stackTrace');
   }
 }
 
-void main() async {
-  await initializeApp();
-  runApp(const MyApp());
+void main() {
+  runZonedGuarded(() async {
+    await initializeApp();
+    runApp(const MyApp());
+  }, (error, stackTrace) {
+    debugPrint('Error in main: $error');
+    debugPrint('Stack trace: $stackTrace');
+  });
 }
 
 class MyApp extends StatefulWidget {
@@ -52,15 +62,10 @@ class _MyAppState extends State<MyApp> {
 
     // Listen for deep links
     appLinks.uriLinkStream.listen((uri) {
-      // Handle deep links here
-      // Example: navigate to specific screen based on the URI
-      if (uri.path.contains('/login')) {
-        // Navigate to login screen
-      } else if (uri.path.contains('/register')) {
-        // Navigate to register screen
-      }
+      debugPrint('Deep link received: $uri');
+      handleDeepLink(uri);
     }, onError: (err) {
-      // Handle errors
+      debugPrint('Error handling deep link: $err');
       if (mounted) {
         showCustomSnackbar(
           context: context, 
@@ -86,10 +91,11 @@ class _MyAppState extends State<MyApp> {
     try {
       final initialUri = await appLinks.getInitialLink();
       if (initialUri != null) {
-        // Handle the initial app link
-        // Similar logic to the stream listener
+        debugPrint('Initial deep link: $initialUri');
+        handleDeepLink(initialUri);
       }
     } catch (e) {
+      debugPrint('Error checking initial app link: $e');
       if (mounted) {
         showCustomSnackbar(
           context: context, 
@@ -108,185 +114,81 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  void handleDeepLink(Uri uri) {
+    if (uri.scheme == 'io.supabase.flutterquickstart') {
+      if (uri.host == 'login-callback') {
+        debugPrint('Login callback received');
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
+      } else if (uri.host == 'reset-callback') {
+        final token = uri.queryParameters['token'];
+        debugPrint('Reset callback received with token: $token');
+        Navigator.pushNamed(
+          context,
+          '/reset-password',
+          arguments: token,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Supabase Auth',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => AuthWrapper(
-              child: StreamBuilder<AuthState>(
-                stream: SupabaseService.client.auth.onAuthStateChange,
-                builder: (context, snapshot) {
-                  debugPrint('=================== AUTH STATE CHANGE ===================');
-                  debugPrint('Has error: ${snapshot.hasError}');
-                  
-                  // Determine initial route based on authentication state
-                  if (snapshot.hasError) {
-                    return const LoginScreen();
-                  }
-                  
-                  final session = snapshot.data?.session;
-                  if (session != null) {
-                    return const HomeScreen();
-                  } else {
-                    return const LoginScreen();
-                  }
-                },
-              ),
+      home: StreamBuilder<AuthState>(
+        stream: SupabaseService.client.auth.onAuthStateChange,
+        builder: (context, snapshot) {
+          debugPrint('Auth state changed:');
+          debugPrint('- Has data: ${snapshot.hasData}');
+          debugPrint('- Event: ${snapshot.data?.event}');
+          debugPrint('- Session: ${snapshot.data?.session != null}');
+          
+          if (snapshot.connectionState == ConnectionState.active) {
+            final session = snapshot.data?.session;
+            final user = session?.user;
+            
+            if (user == null) {
+              return const LoginScreen();
+            }
+            
+            // Check authentication method
+            final authMethod = user.phone != null ? 'phone' : 'email';
+            debugPrint('Auth method: $authMethod');
+            
+            if (authMethod == 'email' && user.emailConfirmedAt == null) {
+              return const EmailConfirmationScreen();
+            }
+            
+            return const HomeScreen();
+          }
+          
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
             ),
+          );
+        },
+      ),
+      routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/email-confirmation': (context) => const EmailConfirmationScreen(),
         '/phone-login': (context) => const PhoneLoginScreen(),
+        '/verify-otp': (context) => VerifyOTPScreen(
+          email: ModalRoute.of(context)?.settings.arguments as String,
+        ),
+        '/home': (context) => const HomeScreen(),
+        '/reset-password': (context) => ResetPasswordScreen(
+          token: ModalRoute.of(context)?.settings.arguments as String?,
+        ),
       },
     );
-  }
-}
-
-class AuthWrapper extends StatefulWidget {
-  final Widget child;
-
-  const AuthWrapper({super.key, required this.child});
-
-  @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends State<AuthWrapper> {
-  final bool _isLoading = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeDeepLinks();
-  }
-
-  Future<void> _initializeDeepLinks() async {
-    if (!mounted) return;
-
-    setState(() {
-      // _isLoading = true; // Commented out since _isLoading is final
-      _error = null;
-    });
-
-    try {
-      // Initialize deep linking
-      final appLinks = AppLinks();
-      
-      // Listen to incoming links
-      appLinks.uriLinkStream.listen(
-        (uri) {
-          debugPrint('Received deep link: $uri');
-          handleDeepLink(uri);
-        },
-        onError: (err) {
-          debugPrint('Error handling deep link: $err');
-          if (mounted) {
-            setState(() {
-              _error = 'Error handling deep link: $err';
-            });
-          }
-        },
-      );
-      
-      // Check for initial link
-      final initialUri = await appLinks.getInitialLink();
-      if (initialUri != null && mounted) {
-        debugPrint('Got initial deep link: $initialUri');
-        handleDeepLink(initialUri);
-      }
-    } catch (e) {
-      debugPrint('Error initializing deep links: $e');
-      if (mounted) {
-        setState(() {
-          _error = 'Error initializing deep links: $e';
-        });
-      }
-    }
-  }
-
-  void handleDeepLink(Uri? uri) async {
-    if (!mounted) return;
-    
-    if (uri == null) return;
-    
-    debugPrint('Received deep link: $uri');
-    
-    if (uri.scheme == 'com.starkey.supabase') {
-      if (uri.host == 'auth-callback') {
-        final token = uri.queryParameters['token'];
-        final type = uri.queryParameters['type'];
-        
-        debugPrint('Auth callback received - Token: $token, Type: $type');
-        
-        try {
-          // Refresh the session to get the latest email verification status
-          await SupabaseService.client.auth.refreshSession();
-          
-          if (mounted) {
-            showCustomSnackbar(
-              context: context,
-              message: 'Email verified successfully!',
-              isSuccess: true,
-              actionLabel: 'Continue',
-              onActionPressed: () {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
-              },
-            );
-          }
-        } catch (e) {
-          debugPrint('Error refreshing session: $e');
-          if (mounted) {
-            showCustomSnackbar(
-              context: context,
-              message: 'Please try logging in to continue.',
-              isSuccess: false,
-              actionLabel: 'Login',
-              onActionPressed: () {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
-              },
-            );
-          }
-        }
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: LoadingAnimationWidget.staggeredDotsWave(
-            color: Colors.white,
-            size: 50,
-          ),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Scaffold(
-        body: Center(
-          child: Text('Error: $_error'),
-        ),
-      );
-    }
-
-    return widget.child;
   }
 }
