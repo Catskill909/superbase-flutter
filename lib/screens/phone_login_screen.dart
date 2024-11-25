@@ -72,12 +72,26 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       if (!mounted) return;
 
       if (response.session != null) {
-        // Explicitly navigate to home after successful verification
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/home',
-          (route) => false,
-        );
+        // Check if user already has a name
+        final userName = SupabaseService.getUserName();
+        
+        if (!mounted) return;
+
+        if (userName == null) {
+          // New user or user without name - go to complete profile
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/complete-profile',
+            (route) => false,
+          );
+        } else {
+          // Existing user with name - go directly to home
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/home',
+            (route) => false,
+          );
+        }
       } else {
         setState(() {
           _isLoading = false;

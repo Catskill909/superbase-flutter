@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseService {
@@ -34,12 +34,30 @@ class SupabaseService {
 
   static User? get currentUser => client.auth.currentUser;
 
+  static bool isValidName(String name) {
+    return RegExp(r'^[a-zA-Z0-9]+$').hasMatch(name);
+  }
+
+  static String formatName(String name) {
+    return name;  // Preserve the original case and format
+  }
+
   static Future<AuthResponse> signUp({
     required String email,
     required String password,
+    required String name,
   }) async {
     try {
       debugPrint('Checking if user exists: $email');
+      
+      // Validate name format
+      if (!isValidName(name)) {
+        throw const AuthException(
+          'Invalid username format. Username must contain only letters and numbers (no spaces or special characters).',
+        );
+      }
+
+      final formattedName = formatName(name);
       
       // Try to sign in first to check if user exists
       try {
@@ -49,59 +67,25 @@ class SupabaseService {
         );
         // If we get here, user exists and password is correct
         throw const AuthException(
-          'This email is already registered. Please sign in instead.',
+          'User already exists',
         );
-      } on AuthException catch (e) {
-        // If error is "Invalid login credentials", user doesn't exist
-        // If error is "Email not confirmed", user exists but needs verification
-        if (e.message.contains('Email not confirmed')) {
-          throw const AuthException(
-            'This email is already registered but not verified. Please check your email for the verification link.',
-          );
-        } else if (!e.message.contains('Invalid login credentials')) {
-          // Some other auth error occurred
+      } catch (e) {
+        if (e is AuthException && e.message == 'User already exists') {
           rethrow;
         }
-        // If we get here, user doesn't exist, proceed with signup
+        // If we get here, user doesn't exist, continue with sign up
       }
-      
-      debugPrint('Attempting to sign up new user: $email');
-      
+
       final response = await client.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: kIsWeb 
-            ? null 
-            : 'com.starkey.supabase://auth-callback/',
-        data: {
-          'email_confirm': true,
-        },
+        data: {'display_name': formattedName},
       );
 
-      debugPrint('Sign up response received: ${response.user?.id}');
-      
-      // Check if email confirmation was sent
-      if (response.user != null && response.session == null) {
-        debugPrint('Email confirmation required. Confirmation email should be sent.');
-      } else {
-        debugPrint('Unexpected response state. Session: ${response.session != null}, User: ${response.user != null}');
-      }
-      
       return response;
-    } on AuthException catch (e) {
-      debugPrint('Auth Exception during sign up: ${e.message}');
-      if (e.message.toLowerCase().contains('rate limit')) {
-        throw const AuthException(
-          'Too many signup attempts. Please wait a few minutes before trying again.',
-        );
-      }
+    } catch (e) {
+      debugPrint('Error in signUp: $e');
       rethrow;
-    } catch (e, stackTrace) {
-      debugPrint('Unexpected error during sign up: $e');
-      debugPrint('Stack trace: $stackTrace');
-      throw const AuthException(
-        'An unexpected error occurred. Please try again later.',
-      );
     }
   }
 
@@ -201,7 +185,51 @@ class SupabaseService {
     }
   }
 
+  static String? getUserName() {
+    final user = currentUser;
+    if (user == null) return null;
+    return user.userMetadata?['display_name'] as String?;
+  }
+
+  static Future<void> updateUserName(String name) async {
+    try {
+      // Validate name format
+      if (!isValidName(name)) {
+        throw const AuthException(
+          'Invalid username format. Username must contain only letters and numbers (no spaces or special characters).',
+        );
+      }
+
+      final formattedName = formatName(name);
+      
+      await client.auth.updateUser(
+        UserAttributes(
+          data: {'display_name': formattedName},
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error updating user name: $e');
+      rethrow;
+    }
+  }
+
   // Phone Authentication Methods
+  static Future<bool> isPhoneRegistered(String phone) async {
+    try {
+      // Try to get user by phone number
+      final response = await client.rpc(
+        'get_user_by_phone',
+        params: {'phone_number': phone},
+      );
+      
+      // If we get a response, the phone is registered
+      return response != null && response.toString().isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking phone registration: $e');
+      return false;
+    }
+  }
+
   static Future<AuthResponse> signInWithPhone({
     required String phone,
   }) async {

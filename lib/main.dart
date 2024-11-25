@@ -12,6 +12,7 @@ import 'package:supabase_auth_app/screens/email_confirmation_screen.dart';
 import 'package:supabase_auth_app/screens/phone_login_screen.dart';
 import 'package:supabase_auth_app/screens/reset_password_screen.dart';
 import 'package:supabase_auth_app/screens/verify_otp_screen.dart';
+import 'package:supabase_auth_app/screens/complete_profile_screen.dart';
 
 // Service imports
 import 'package:supabase_auth_app/services/supabase_service.dart';
@@ -188,6 +189,7 @@ class _MyAppState extends State<MyApp> {
         '/reset-password': (context) => ResetPasswordScreen(
           token: ModalRoute.of(context)?.settings.arguments as String?,
         ),
+        '/complete-profile': (context) => const CompleteProfileScreen(),
       },
     );
   }

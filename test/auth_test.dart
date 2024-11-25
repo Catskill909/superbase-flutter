@@ -31,6 +31,7 @@ void main() {
         final response = await SupabaseService.signUp(
           email: testEmail,
           password: testPassword,
+          name: 'Test User',
         );
 
         expect(response.user, isNotNull);

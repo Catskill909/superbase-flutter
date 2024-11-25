@@ -8,11 +8,12 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = SupabaseService.currentUser;
+    final userName = SupabaseService.getUserName() ?? 'User';
     final displayId = user?.phone ?? user?.email ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home'),
+        title: Text('Welcome, $userName'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
