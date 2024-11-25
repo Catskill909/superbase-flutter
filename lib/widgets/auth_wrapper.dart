@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../services/supabase_service.dart';
+import '../widgets/custom_snackbar.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -39,11 +40,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
           } else {
             // Show a message about email verification
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please verify your email to continue.'),
-                  backgroundColor: Colors.orange,
-                ),
+              showCustomSnackbar(
+                context: context,
+                message: 'Please verify your email to continue.',
+                isSuccess: false,
+                duration: const Duration(seconds: 5),
               );
             });
             return const LoginScreen();

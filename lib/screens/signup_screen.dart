@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../services/supabase_service.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/custom_snackbar.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -37,11 +38,11 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
 
       if (result.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please check your email to verify your account'),
-            duration: Duration(seconds: 5),
-          ),
+        showCustomSnackbar(
+          context: context,
+          message: 'Please check your email to verify your account',
+          isSuccess: true,
+          duration: const Duration(seconds: 5),
         );
         Navigator.pop(context); // Go back to login screen
       }

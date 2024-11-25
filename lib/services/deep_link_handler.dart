@@ -1,6 +1,7 @@
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/custom_snackbar.dart';
 
 class DeepLinkHandler {
   static final _appLinks = AppLinks();
@@ -58,8 +59,11 @@ class DeepLinkHandler {
   }
 
   static void _showMessage(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showCustomSnackbar(
+      context: context,
+      message: message,
+      isSuccess: !message.toLowerCase().contains('error'),
+      duration: const Duration(seconds: 5),
     );
   }
 }
